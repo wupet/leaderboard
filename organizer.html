@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Treasure Hunt — Organizer Dashboard</title>
+  <style>
+    :root {
+      --bg-0: #070b16;
+      --bg-1: #0d1424;
+      --bg-2: #121b30;
+      --surface: rgba(255, 255, 255, 0.03);
+      --surface-hover: rgba(255, 255, 255, 0.07);
+      --border: rgba(120, 160, 255, 0.12);
+      --text: #e2e8f0;
+      --text-muted: #7e8db0;
+      --neon-cyan: #22d3ee;
+      --neon-magenta: #e935c1;
+      --neon-gold: #f5c451;
+      --neon-green: #34ffb0;
+      --neon-purple: #a06bff;
+      --error: #ff5c7c;
+      --radius: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background:
+        radial-gradient(circle at 15% 10%, rgba(34,211,238,0.08), transparent 40%),
+        radial-gradient(circle at 85% 90%, rgba(233,53,193,0.08), transparent 40%),
+        var(--bg-0);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+    ::-webkit-scrollbar { width: 8px; height: 8px; }
+    ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+
+    .app { display: grid; grid-template-columns: 340px 1fr; min-height: 100vh; }
+
+    /* SIDEBAR */
+    .sidebar {
+      background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
+      border-right: 1px solid var(--border);
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      overflow-y: auto;
+    }
+    .logo {
+      font-size: 1.15rem;
+      font-weight: 700;
+      letter-spacing: -0.01em;
+      text-shadow: 0 0 12px rgba(34,211,238,0.5);
+      color: var(--neon-cyan);
+    }
+    .logo span { color: var(--text-muted); font-weight: 400; display: block; font-size: 0.72rem; letter-spacing: 0.1em; text-transform: uppercase; margin-top: 3px; text-shadow: none; }
+
+    .scan-panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+    }
+
+    /* DROP ZONE */
+    .dropzone {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 26px 16px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.25s;
+      background: rgba(34,211,238,0.02);
+    }
+    .dropzone:hover { border-color: var(--neon-cyan); background: rgba(34,211,238,0.06); }
+    .dropzone.dragover {
+      border-color: var(--neon-cyan);
+      background: rgba(34,211,238,0.12);
+      box-shadow: inset 0 0 24px rgba(34,211,238,0.15);
+    }
+    .dropzone svg { width: 34px; height: 34px; stroke: var(--neon-cyan); margin-bottom: 10px; }
+    .dropzone .dz-title { font-weight: 600; font-size: 0.92rem; margin-bottom: 4px; }
+    .dropzone .dz-sub { font-size: 0.75rem; color: var(--text-muted); }
+
+    .scan-status {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      margin-top: 12px;
+      min-height: 18px;
+      text-align: center;
+    }
+    .scan-status.ok { color: var(--neon-green); }
+    .scan-status.dup { color: var(--neon-gold); }
+    .scan-status.err { color: var(--error); }
+
+    button {
+      width: 100%;
+      padding: 12px;
+      border: none;
+      border-radius: 10px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+      background: linear-gradient(135deg, var(--neon-cyan), var(--neon-purple));
+      color: #04121a;
+      box-shadow: 0 0 14px rgba(34,211,238,0.3);
+    }
+    button:hover { box-shadow: 0 0 22px rgba(34,211,238,0.55); transform: translateY(-1px); }
+    button.ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); box-shadow: none; }
+    button.ghost:hover { background: var(--surface-hover); color: var(--text); box-shadow: none; transform: none; }
+
+    .fact-feed { flex: 1; display: flex; flex-direction: column; gap: 10px; }
+    .fact-feed h3 {
+      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em;
+      color: var(--neon-magenta); margin-bottom: 4px; text-shadow: 0 0 10px rgba(233,53,193,0.5);
+    }
+    .fact-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--neon-gold);
+      border-radius: 10px;
+      padding: 12px 14px;
+      transition: all 0.4s;
+      animation: slideIn 0.5s ease;
+    }
+    @keyframes slideIn { from { opacity: 0; transform: translateX(-12px);} to {opacity:1; transform:none;} }
+    .fact-card .fact-label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 4px; }
+    .fact-card .fact-value { font-size: 0.98rem; font-weight: 600; }
+    .fact-card .fact-value em { color: var(--neon-cyan); font-style: normal; text-shadow: 0 0 8px rgba(34,211,238,0.4); }
+
+    /* MAIN */
+    .main { padding: 30px 34px; overflow-y: auto; }
+    .main-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
+    .main-head h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
+    .counter { color: var(--text-muted); font-size: 0.9rem; }
+    .counter strong { color: var(--neon-green); font-size: 1.3rem; text-shadow: 0 0 10px rgba(52,255,176,0.4); }
+
+    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .panel {
+      background: var(--bg-1);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 22px;
+    }
+    .panel.full { grid-column: 1 / -1; }
+    .panel h2 { font-size: 1.05rem; margin-bottom: 16px; font-weight: 600; }
+    .panel h2 .accent { color: var(--neon-cyan); }
+
+    /* LEADERBOARD */
+    table { width: 100%; border-collapse: collapse; }
+    th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 8px 10px; border-bottom: 1px solid var(--border); }
+    td { padding: 11px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.9rem; }
+    tr { transition: background 0.3s; }
+    tr:hover td { background: var(--surface-hover); }
+    .rank { font-weight: 700; width: 40px; }
+    .rank-1 { color: var(--neon-gold); text-shadow: 0 0 10px rgba(245,196,81,0.5); }
+    .rank-2 { color: #cfd8ea; }
+    .rank-3 { color: #d9a066; }
+    .team-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 26px; padding: 0 8px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); font-weight: 600; font-size: 0.82rem; }
+    .empty { color: var(--text-muted); text-align: center; padding: 30px; font-size: 0.9rem; }
+
+    /* GRAPH */
+    #progressChart { width: 100%; height: 300px; display: block; }
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 0.75rem; color: var(--text-muted); }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+    .flash { animation: flash 0.6s ease; }
+    @keyframes flash { 0%{ background: rgba(52,255,176,0.25);} 100%{ background: transparent;} }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+      <div class="logo">Treasure Hunt<span>Organizer Dashboard</span></div>
+
+      <div class="scan-panel">
+        <div class="dropzone" id="dropzone" onclick="document.getElementById('qrFile').click()">
+          <svg viewBox="0 0 24 24" fill="none" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <div class="dz-title">Add a Team Result</div>
+          <div class="dz-sub">Click, or drag &amp; drop a QR image here</div>
+        </div>
+        <input type="file" id="qrFile" accept="image/*" multiple style="display:none" onchange="handleFiles(event.target.files)">
+        <div class="scan-status" id="scanStatus">Ready to scan</div>
+        <button class="ghost" style="margin-top:10px;" onclick="manualEntry()">Manual Entry</button>
+        <button class="ghost" style="margin-top:8px;" onclick="resetAll()">Clear All Data</button>
+      </div>
+
+      <div class="fact-feed">
+        <h3>Live Fun Facts</h3>
+        <div id="factList"></div>
+      </div>
+    </aside>
+
+    <!-- MAIN -->
+    <main class="main">
+      <div class="main-head">
+        <h1>Live Standings</h1>
+        <div class="counter"><strong id="teamCount">0</strong> teams finished</div>
+      </div>
+
+      <div class="grid">
+        <div class="panel">
+          <h2>Leaderboard <span class="accent">— by finish time</span></h2>
+          <div id="leaderboard"></div>
+        </div>
+
+        <div class="panel">
+          <h2>Hint Usage <span class="accent">— per team</span></h2>
+          <div id="hintPanel"></div>
+        </div>
+
+        <div class="panel full">
+          <h2>Progress Over Time <span class="accent">— cumulative finishers</span></h2>
+          <canvas id="progressChart"></canvas>
+          <div class="legend">
+            <span><i style="background:var(--neon-cyan)"></i> Finishers over the day</span>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="jsQR.js"></script>
+  <script src="organizer.js"></script>
+</body>
+</html>
