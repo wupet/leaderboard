@@ -32,13 +32,20 @@
       color: var(--text);
       min-height: 100vh;
       overflow-x: hidden;
+      overflow: hidden;
     }
     ::-webkit-scrollbar { width: 8px; height: 8px; }
     ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
 
-    .app { display: grid; grid-template-columns: 340px 1fr; min-height: 100vh; }
+    .app {
+      display: grid;
+      grid-template-columns: 340px 1fr;
+      min-height: 100vh;
+      transition: grid-template-columns 0.35s ease;
+    }
+    .app.collapsed { grid-template-columns: 0px 1fr; }
 
-    /* SIDEBAR */
+    /* SIDEBAR (admin only) */
     .sidebar {
       background: linear-gradient(180deg, var(--bg-1), var(--bg-0));
       border-right: 1px solid var(--border);
@@ -46,7 +53,14 @@
       display: flex;
       flex-direction: column;
       gap: 18px;
-      overflow-y: auto;
+      overflow: hidden;
+      transition: opacity 0.25s ease, padding 0.35s ease;
+    }
+    .app.collapsed .sidebar {
+      opacity: 0;
+      padding-left: 0;
+      padding-right: 0;
+      pointer-events: none;
     }
     .logo {
       font-size: 1.15rem;
@@ -95,6 +109,36 @@
     .scan-status.dup { color: var(--neon-gold); }
     .scan-status.err { color: var(--error); }
 
+    /* START TIME */
+    .start-time-row {
+      margin-top: 14px;
+      padding-top: 14px;
+      border-top: 1px solid var(--border);
+    }
+    .start-time-row label {
+      display: block;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+    .start-time-inputs { display: flex; gap: 8px; }
+    .start-time-inputs input[type=time] {
+      flex: 1;
+      padding: 9px 11px;
+      border-radius: 9px;
+      border: 1px solid var(--border);
+      background: var(--surface);
+      color: var(--text);
+      font-size: 0.9rem;
+      font-family: inherit;
+    }
+    .start-time-inputs input[type=time]:focus { outline: none; border-color: var(--neon-cyan); }
+    .start-time-inputs input[type=time]::-webkit-calendar-picker-indicator { filter: invert(0.7); cursor: pointer; }
+    .start-time-note { font-size: 0.72rem; color: var(--text-muted); margin-top: 8px; }
+    .start-time-note.set { color: var(--neon-green); }
+
     button {
       width: 100%;
       padding: 12px;
@@ -111,45 +155,118 @@
     button:hover { box-shadow: 0 0 22px rgba(34,211,238,0.55); transform: translateY(-1px); }
     button.ghost { background: transparent; color: var(--text-muted); border: 1px solid var(--border); box-shadow: none; }
     button.ghost:hover { background: var(--surface-hover); color: var(--text); box-shadow: none; transform: none; }
-
-    .fact-feed { flex: 1; display: flex; flex-direction: column; gap: 10px; }
-    .fact-feed h3 {
-      font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em;
-      color: var(--neon-magenta); margin-bottom: 4px; text-shadow: 0 0 10px rgba(233,53,193,0.5);
-    }
-    .fact-card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-left: 3px solid var(--neon-gold);
-      border-radius: 10px;
-      padding: 12px 14px;
-      transition: all 0.4s;
-      animation: slideIn 0.5s ease;
-    }
-    @keyframes slideIn { from { opacity: 0; transform: translateX(-12px);} to {opacity:1; transform:none;} }
-    .fact-card .fact-label { font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-muted); margin-bottom: 4px; }
-    .fact-card .fact-value { font-size: 0.98rem; font-weight: 600; }
-    .fact-card .fact-value em { color: var(--neon-cyan); font-style: normal; text-shadow: 0 0 8px rgba(34,211,238,0.4); }
+    button.mini { width: auto; padding: 9px 14px; font-size: 0.82rem; }
 
     /* MAIN */
-    .main { padding: 30px 34px; overflow-y: auto; }
-    .main-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 24px; }
+    .main {
+        padding: 30px 34px;
+        height: 100vh;
+        box-sizing: border-box;   /* padding counts inside 100vh */
+        overflow: hidden;         /* was overflow-y: auto — kills the phantom scroll */
+        display: flex;
+        flex-direction: column;
+    }
+    .main-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+    .head-left { display: flex; align-items: center; gap: 14px; }
     .main-head h1 { font-size: 1.6rem; font-weight: 700; letter-spacing: -0.02em; }
     .counter { color: var(--text-muted); font-size: 0.9rem; }
     .counter strong { color: var(--neon-green); font-size: 1.3rem; text-shadow: 0 0 10px rgba(52,255,176,0.4); }
 
-    .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+    .collapse-btn {
+      width: 42px;
+      height: 42px;
+      flex-shrink: 0;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      box-shadow: none;
+      color: var(--neon-cyan);
+    }
+    .collapse-btn:hover { background: var(--surface-hover); box-shadow: 0 0 16px rgba(34,211,238,0.3); transform: none; }
+    .collapse-btn svg { width: 20px; height: 20px; stroke: currentColor; }
+
+    /* TOP ROW: three mini-blocks */
+    .top-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 22px;
+        margin-bottom: 22px;
+        flex: 0 0 auto;           /* fixed height, doesn't stretch */
+    }
+
     .panel {
       background: var(--bg-1);
       border: 1px solid var(--border);
       border-radius: 18px;
       padding: 22px;
     }
-    .panel.full { grid-column: 1 / -1; }
     .panel h2 { font-size: 1.05rem; margin-bottom: 16px; font-weight: 600; }
     .panel h2 .accent { color: var(--neon-cyan); }
 
-    /* LEADERBOARD */
+    /* mini-block scroll areas so tables don't blow up the row height */
+    .mini-block { display: flex; flex-direction: column; max-height: 340px; }
+    .mini-block .scroll-area { overflow-y: auto; flex: 1; }
+
+    /* FUN FACTS CYCLING BLOCK */
+    .facts-block .fact-view {
+      position: relative;
+      min-height: 120px;
+      display: flex;
+      align-items: center;
+      border-left: 4px solid var(--neon-gold);
+      background: var(--surface);
+      border-radius: 12px;
+      padding: 20px;
+      overflow: hidden;
+    }
+    .facts-block .fact-view::after {
+      content: '';
+      position: absolute;
+      right: -40px; top: -40px;
+      width: 150px; height: 150px;
+      background: radial-gradient(circle, rgba(245,196,81,0.12), transparent 70%);
+      pointer-events: none;
+    }
+    .fact-inner { width: 100%; }
+    .fact-inner .fact-label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--neon-magenta);
+      text-shadow: 0 0 10px rgba(233,53,193,0.4);
+      margin-bottom: 8px;
+    }
+    .fact-inner .fact-value { font-size: 1.25rem; font-weight: 700; letter-spacing: -0.01em; line-height: 1.35; }
+    .fact-inner .fact-value em { color: var(--neon-cyan); font-style: normal; text-shadow: 0 0 12px rgba(34,211,238,0.5); }
+    .fact-inner.swap { animation: factSwap 0.5s ease; }
+    @keyframes factSwap {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: none; }
+    }
+    .fact-dots { display: flex; gap: 6px; justify-content: center; margin-top: 14px; }
+    .fact-dots i {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--border);
+      transition: background 0.3s, transform 0.3s;
+    }
+    .fact-dots i.active { background: var(--neon-cyan); transform: scale(1.4); box-shadow: 0 0 8px rgba(34,211,238,0.6); }
+
+    /* GRAPH (full width, bottom) */
+    .panel.full {
+      display: flex;
+      flex-direction: column;
+      flex: 1;
+      min-height: 0;
+    }
+    #progressChart { width: 100%; height: 100%; min-height: 220px; display: block; flex: 1; }
+    .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 0.75rem; color: var(--text-muted); }
+    .legend span { display: inline-flex; align-items: center; gap: 6px; }
+    .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+    /* TABLES */
     table { width: 100%; border-collapse: collapse; }
     th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); padding: 8px 10px; border-bottom: 1px solid var(--border); }
     td { padding: 11px 10px; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 0.9rem; }
@@ -162,20 +279,14 @@
     .team-chip { display: inline-flex; align-items: center; justify-content: center; min-width: 30px; height: 26px; padding: 0 8px; border-radius: 8px; background: var(--surface); border: 1px solid var(--border); font-weight: 600; font-size: 0.82rem; }
     .empty { color: var(--text-muted); text-align: center; padding: 30px; font-size: 0.9rem; }
 
-    /* GRAPH */
-    #progressChart { width: 100%; height: 300px; display: block; }
-    .legend { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 12px; font-size: 0.75rem; color: var(--text-muted); }
-    .legend span { display: inline-flex; align-items: center; gap: 6px; }
-    .legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
-
     .flash { animation: flash 0.6s ease; }
     @keyframes flash { 0%{ background: rgba(52,255,176,0.25);} 100%{ background: transparent;} }
   </style>
 </head>
 <body>
-  <div class="app">
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
+  <div class="app" id="app">
+    <!-- SIDEBAR (admin only) -->
+    <aside class="sidebar" id="sidebar">
       <div class="logo">Treasure Hunt<span>Organizer Dashboard</span></div>
 
       <div class="scan-panel">
@@ -190,41 +301,65 @@
         </div>
         <input type="file" id="qrFile" accept="image/*" multiple style="display:none" onchange="handleFiles(event.target.files)">
         <div class="scan-status" id="scanStatus">Ready to scan</div>
+
+        <div class="start-time-row">
+          <label for="startTime">Event Start Time</label>
+          <div class="start-time-inputs">
+            <input type="time" id="startTime" step="1" onchange="setStartTime()">
+            <button class="ghost mini" onclick="setStartNow()">Now</button>
+          </div>
+          <div class="start-time-note" id="startTimeNote">Not set — Riddle 1 durations unavailable</div>
+        </div>
+
         <button class="ghost" style="margin-top:10px;" onclick="manualEntry()">Manual Entry</button>
         <button class="ghost" style="margin-top:8px;" onclick="resetAll()">Clear All Data</button>
-      </div>
-
-      <div class="fact-feed">
-        <h3>Live Fun Facts</h3>
-        <div id="factList"></div>
       </div>
     </aside>
 
     <!-- MAIN -->
     <main class="main">
       <div class="main-head">
-        <h1>Live Standings</h1>
+        <div class="head-left">
+          <button class="collapse-btn" id="collapseBtn" onclick="toggleSidebar()" title="Toggle admin panel">
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="3" y1="12" x2="21" y2="12"></line>
+              <line x1="3" y1="6" x2="21" y2="6"></line>
+              <line x1="3" y1="18" x2="21" y2="18"></line>
+            </svg>
+          </button>
+          <h1>Live Standings</h1>
+        </div>
         <div class="counter"><strong id="teamCount">0</strong> teams finished</div>
       </div>
 
-      <div class="grid">
-        <div class="panel">
-          <h2>Leaderboard <span class="accent">— by finish time</span></h2>
-          <div id="leaderboard"></div>
-        </div>
-
-        <div class="panel">
-          <h2>Hint Usage <span class="accent">— per team</span></h2>
-          <div id="hintPanel"></div>
-        </div>
-
-        <div class="panel full">
-          <h2>Progress Over Time <span class="accent">— cumulative finishers</span></h2>
-          <canvas id="progressChart"></canvas>
-          <div class="legend">
-            <span><i style="background:var(--neon-cyan)"></i> Finishers over the day</span>
+      <!-- TOP ROW: 3 mini-blocks -->
+      <div class="top-row">
+        <div class="panel mini-block facts-block">
+          <h2>Fun Facts <span class="accent">— live</span></h2>
+          <div class="fact-view">
+            <div class="fact-inner" id="factInner"></div>
           </div>
+          <div class="fact-dots" id="factDots"></div>
         </div>
+
+        <div class="panel mini-block">
+          <h2>Leaderboard <span class="accent">— by finish</span></h2>
+          <div class="scroll-area" id="leaderboard"></div>
+        </div>
+
+        <div class="panel mini-block">
+          <h2>Hint Usage <span class="accent">— per team</span></h2>
+          <div class="scroll-area" id="hintPanel"></div>
+        </div>
+      </div>
+
+      <!-- GRAPH: full width bottom -->
+      <div class="panel full">
+        <h2>Progress Over Time <span class="accent">— cumulative finishers</span></h2>
+        <canvas id="progressChart"></canvas>
+        <!-- <div class="legend">
+          <span><i style="background:var(--neon-cyan)"></i> Finishers over the day</span>
+        </div> -->
       </div>
     </main>
   </div>

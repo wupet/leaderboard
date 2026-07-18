@@ -3,6 +3,15 @@ const NUM_RIDDLES = 8;
 
 // ============ STATE ============
 let teams = {}; // keyed by team number => duplicates ignored automatically
+let startTime = null; // event start time as seconds-since-midnight, or null if unset
+
+// Fun-facts cycling state
+let factCycleIndex = 0;
+let factCycleTimer = null;
+let currentFacts = [];
+
+// Sidebar state
+let sidebarCollapsed = false;
 
 // ============ DECODER (mirrors finishGame: "team|r,h,t;r,h,t;...") ============
 function decodeResult(str) {
@@ -54,10 +63,66 @@ function riddleDurations(t) {
   const durs = [];
   for (let i = 0; i < t.steps.length; i++) {
     if (t.steps[i].completedAt < 0) { durs.push(-1); continue; }
-    const prev = i === 0 ? t.steps[0].completedAt : t.steps[i-1].completedAt;
+    let prev;
+    if (i === 0) {
+      prev = (startTime !== null) ? startTime : t.steps[0].completedAt;
+    } else {
+      prev = t.steps[i-1].completedAt;
+    }
     durs.push(Math.max(0, t.steps[i].completedAt - prev));
   }
   return durs;
+}
+
+// ============ START TIME ============
+function setStartTime() {
+  const val = document.getElementById('startTime').value;
+  if (!val) { startTime = null; }
+  else {
+    const parts = val.split(':').map(Number);
+    startTime = parts[0] * 3600 + parts[1] * 60 + (parts[2] || 0);
+  }
+  saveStartTime();
+  updateStartTimeNote();
+  renderAll();
+}
+
+function setStartNow() {
+  const d = new Date();
+  startTime = d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds();
+  const pad = n => String(n).padStart(2, '0');
+  document.getElementById('startTime').value =
+    `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  saveStartTime();
+  updateStartTimeNote();
+  renderAll();
+}
+
+function updateStartTimeNote() {
+  const note = document.getElementById('startTimeNote');
+  if (startTime === null) {
+    note.textContent = 'Not set — Riddle 1 durations unavailable';
+    note.classList.remove('set');
+  } else {
+    note.textContent = `Start set to ${secondsToTime(startTime)} — all riddles timed`;
+    note.classList.add('set');
+  }
+}
+
+function saveStartTime() {
+  try { localStorage.setItem('organizerStartTime', JSON.stringify(startTime)); } catch(e) {}
+}
+function loadStartTime() {
+  try {
+    const s = localStorage.getItem('organizerStartTime');
+    if (s !== null) {
+      startTime = JSON.parse(s);
+      if (startTime !== null) {
+        document.getElementById('startTime').value = secondsToTime(startTime);
+      }
+    }
+  } catch(e) {}
+  updateStartTimeNote();
 }
 
 // ============ RENDER: LEADERBOARD ============
@@ -108,7 +173,7 @@ function renderChart() {
   const canvas = document.getElementById('progressChart');
   const ctx = canvas.getContext('2d');
   const dpr = window.devicePixelRatio || 1;
-  const W = canvas.clientWidth, H = 300;
+  const W = canvas.clientWidth, H = canvas.clientHeight;
   canvas.width = W * dpr; canvas.height = H * dpr;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.scale(dpr, dpr);
@@ -165,42 +230,119 @@ function renderChart() {
   pts.forEach(p => { ctx.beginPath(); ctx.arc(p.x, p.y, 4, 0, Math.PI*2); ctx.fill(); });
 }
 
-// ============ RENDER: FUN FACTS ============
-function renderFacts() {
-  const el = document.getElementById('factList');
+// ============ FUN FACTS (cycling block) ============
+function buildFacts() {
   const list = Object.values(teams);
-  if (!list.length) { el.innerHTML = '<div class="fact-card"><div class="fact-value">Add a team to begin.</div></div>'; return; }
+  if (!list.length) return [];
 
   const facts = [];
-  const finished = list.filter(t => t.finishAt >= 0).sort((a,b) => a.finishAt - b.finishAt);
-  if (finished.length) facts.push(['First to Finish', `Team <em>${finished[0].team}</em> at ${secondsToTime(finished[0].finishAt)}`]);
+  const finished = list.filter(t => t.finishAt >= 0).sort((a, b) => a.finishAt - b.finishAt);
+  if (finished.length) {
+    facts.push(['First to Finish', `Team <em>${finished[0].team}</em> at ${secondsToTime(finished[0].finishAt)}`]);
+  }
+  if (startTime !== null && finished.length) {
+    const fastestOverall = finished[0].finishAt - startTime;
+    facts.push(['Fastest Overall Run', `Team <em>${finished[0].team}</em> — ${durationStr(fastestOverall)} total`]);
+  }
 
-  const byHints = [...list].sort((a,b) => b.hintsTotal - a.hintsTotal);
+  const byHints = [...list].sort((a, b) => b.hintsTotal - a.hintsTotal);
   facts.push(['Most Hints Used', `Team <em>${byHints[0].team}</em> — ${byHints[0].hintsTotal} hints`]);
-  const least = [...list].sort((a,b) => a.hintsTotal - b.hintsTotal)[0];
+  const least = [...list].sort((a, b) => a.hintsTotal - b.hintsTotal)[0];
   facts.push(['Fewest Hints Used', `Team <em>${least.team}</em> — ${least.hintsTotal} hints`]);
 
   let longest = { secs: -1, team: null, riddle: null };
   list.forEach(t => riddleDurations(t).forEach((d, i) => {
     if (d > longest.secs) longest = { secs: d, team: t.team, riddle: t.steps[i].riddle };
   }));
-  if (longest.team !== null) facts.push(['Longest on One Riddle', `Team <em>${longest.team}</em> — ${durationStr(longest.secs)} on Riddle ${longest.riddle}`]);
+  if (longest.team !== null) {
+    facts.push(['Longest on One Riddle', `Team <em>${longest.team}</em> — ${durationStr(longest.secs)} on Riddle ${longest.riddle}`]);
+  }
 
   let fastest = { secs: Infinity, team: null, riddle: null };
   list.forEach(t => riddleDurations(t).forEach((d, i) => {
-    if (i !== 0 && d >= 0 && d < fastest.secs) fastest = { secs: d, team: t.team, riddle: t.steps[i].riddle };
+    if (i === 0 && startTime === null) return;
+    if (d >= 0 && d < fastest.secs) fastest = { secs: d, team: t.team, riddle: t.steps[i].riddle };
   }));
-  if (fastest.team !== null) facts.push(['Fastest Riddle Solve', `Team <em>${fastest.team}</em> — ${durationStr(fastest.secs)} on Riddle ${fastest.riddle}`]);
+  if (fastest.team !== null) {
+    facts.push(['Fastest Riddle Solve', `Team <em>${fastest.team}</em> — ${durationStr(fastest.secs)} on Riddle ${fastest.riddle}`]);
+  }
 
   const totalHints = list.reduce((s, t) => s + t.hintsTotal, 0);
-  facts.push(['Total Hints Used', `<em>${totalHints}</em> across ${list.length} team${list.length>1?'s':''}`]);
+  facts.push(['Total Hints Used', `<em>${totalHints}</em> across ${list.length} team${list.length > 1 ? 's' : ''}`]);
 
   const perfect = list.filter(t => t.hintsTotal === 0).map(t => t.team);
-  if (perfect.length) facts.push(['Flawless Runs (0 hints)', `Team${perfect.length>1?'s':''} <em>${perfect.join(', ')}</em>`]);
+  if (perfect.length) {
+    facts.push(['Flawless Runs (0 hints)', `Team${perfect.length > 1 ? 's' : ''} <em>${perfect.join(', ')}</em>`]);
+  }
 
-  el.innerHTML = facts.map(([label, val]) =>
-    `<div class="fact-card"><div class="fact-label">${label}</div><div class="fact-value">${val}</div></div>`
+  return facts;
+}
+
+// Rebuild facts (called from renderAll). Keeps cycle index valid and refreshes display.
+function renderFacts() {
+  currentFacts = buildFacts();
+  if (factCycleIndex >= currentFacts.length) factCycleIndex = 0;
+  renderFactDots();
+  showCurrentFact();
+  // (Re)start the cycle if we have facts; stop if none.
+  if (currentFacts.length > 1) startFactCycle();
+  else stopFactCycle();
+}
+
+function renderFactDots() {
+  const dots = document.getElementById('factDots');
+  if (!currentFacts.length) { dots.innerHTML = ''; return; }
+  dots.innerHTML = currentFacts.map((_, i) =>
+    `<i class="${i === factCycleIndex ? 'active' : ''}"></i>`
   ).join('');
+}
+
+function showCurrentFact() {
+  const inner = document.getElementById('factInner');
+  if (!currentFacts.length) {
+    inner.innerHTML = `<div class="fact-value" style="font-size:1rem;color:var(--text-muted)">Add a team to begin.</div>`;
+    return;
+  }
+  const [label, val] = currentFacts[factCycleIndex];
+  inner.classList.remove('swap');
+  void inner.offsetWidth; // restart animation
+  inner.classList.add('swap');
+  inner.innerHTML = `<div class="fact-label">${label}</div><div class="fact-value">${val}</div>`;
+  renderFactDots();
+}
+
+function nextFact() {
+  if (currentFacts.length < 2) return;
+  factCycleIndex = (factCycleIndex + 1) % currentFacts.length;
+  showCurrentFact();
+}
+
+function startFactCycle() {
+  stopFactCycle();
+  factCycleTimer = setInterval(nextFact, 5000);
+}
+function stopFactCycle() {
+  if (factCycleTimer) { clearInterval(factCycleTimer); factCycleTimer = null; }
+}
+
+// ============ SIDEBAR TOGGLE ============
+function toggleSidebar() {
+  sidebarCollapsed = !sidebarCollapsed;
+  document.getElementById('app').classList.toggle('collapsed', sidebarCollapsed);
+  saveSidebarState();
+  // Layout width changes → redraw chart after the transition.
+  setTimeout(renderChart, 400);
+}
+
+function saveSidebarState() {
+  try { localStorage.setItem('sidebarCollapsed', JSON.stringify(sidebarCollapsed)); } catch(e) {}
+}
+function loadSidebarState() {
+  try {
+    const s = localStorage.getItem('sidebarCollapsed');
+    if (s !== null) sidebarCollapsed = JSON.parse(s);
+  } catch(e) {}
+  document.getElementById('app').classList.toggle('collapsed', sidebarCollapsed);
 }
 
 // ============ RENDER ALL ============
@@ -252,7 +394,7 @@ function handleFiles(fileList) {
       const code = jsQR(data.data, data.width, data.height);
       if (code) {
         const res = addResult(code.data);
-        if (res.status === 'ok') { ok++; if (res.status==='ok') flashSuccess(); }
+        if (res.status === 'ok') { ok++; flashSuccess(); }
         else if (res.status === 'dup') dup++;
         else err++;
         lastMsg = res.msg;
@@ -303,15 +445,19 @@ function setupDragDrop() {
     if (files && files.length) handleFiles(files);
   });
 
-  // Allow dropping anywhere on the page too
   window.addEventListener('dragover', e => e.preventDefault());
   window.addEventListener('drop', e => {
     e.preventDefault();
-    if (e.target.closest('#dropzone')) return; // already handled
+    if (e.target.closest('#dropzone')) return;
     if (e.dataTransfer.files && e.dataTransfer.files.length) handleFiles(e.dataTransfer.files);
   });
 }
 
 // ============ INIT ============
-window.addEventListener('load', () => { loadData(); setupDragDrop(); });
+window.addEventListener('load', () => {
+  loadData();          // populates teams + builds/cycles facts via renderAll()
+  loadStartTime();
+  setupDragDrop();
+  loadSidebarState();
+});
 window.addEventListener('resize', renderChart);
