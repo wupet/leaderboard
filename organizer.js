@@ -237,25 +237,25 @@ function buildFacts() {
 
   const facts = [];
   const finished = list.filter(t => t.finishAt >= 0).sort((a, b) => a.finishAt - b.finishAt);
-  if (finished.length) {
-    facts.push(['First to Finish', `Team <em>${finished[0].team}</em> at ${secondsToTime(finished[0].finishAt)}`]);
-  }
-  if (startTime !== null && finished.length) {
-    const fastestOverall = finished[0].finishAt - startTime;
-    facts.push(['Fastest Overall Run', `Team <em>${finished[0].team}</em> — ${durationStr(fastestOverall)} total`]);
-  }
+//   if (finished.length) {
+//     facts.push(['First to Finish', `Team <em>${finished[0].team}</em> at ${secondsToTime(finished[0].finishAt)}`]);
+//   }
+//   if (startTime !== null && finished.length) {
+//     const fastestOverall = finished[0].finishAt - startTime;
+//     facts.push(['Fastest Overall Run', `Team <em>${finished[0].team}</em> — ${durationStr(fastestOverall)} total`]);
+//   }
 
-  const byHints = [...list].sort((a, b) => b.hintsTotal - a.hintsTotal);
-  facts.push(['Most Hints Used', `Team <em>${byHints[0].team}</em> — ${byHints[0].hintsTotal} hints`]);
-  const least = [...list].sort((a, b) => a.hintsTotal - b.hintsTotal)[0];
-  facts.push(['Fewest Hints Used', `Team <em>${least.team}</em> — ${least.hintsTotal} hints`]);
+//   const byHints = [...list].sort((a, b) => b.hintsTotal - a.hintsTotal);
+//   facts.push(['Most Hints Used', `Team <em>${byHints[0].team}</em> — ${byHints[0].hintsTotal} hints`]);
+//   const least = [...list].sort((a, b) => a.hintsTotal - b.hintsTotal)[0];
+//   facts.push(['Fewest Hints Used', `Team <em>${least.team}</em> — ${least.hintsTotal} hints`]);
 
   let longest = { secs: -1, team: null, riddle: null };
   list.forEach(t => riddleDurations(t).forEach((d, i) => {
     if (d > longest.secs) longest = { secs: d, team: t.team, riddle: t.steps[i].riddle };
   }));
   if (longest.team !== null) {
-    facts.push(['Longest on One Riddle', `Team <em>${longest.team}</em> — ${durationStr(longest.secs)} on Riddle ${longest.riddle}`]);
+    facts.push(['Longest Time Spent on One Riddle', `Team <em>${longest.team}</em> — ${durationStr(longest.secs)} on Riddle ${longest.riddle}`]);
   }
 
   let fastest = { secs: Infinity, team: null, riddle: null };
