@@ -349,7 +349,6 @@ function loadSidebarState() {
 function renderAll() {
   document.getElementById('teamCount').textContent = Object.keys(teams).length;
   renderLeaderboard();
-  renderHintPanel();
   renderChart();
   renderFacts();
 }
@@ -453,11 +452,82 @@ function setupDragDrop() {
   });
 }
 
-// ============ INIT ============
+// ============ CHART: KEEP BACKING STORE IN SYNC WITH LAYOUT ============
+// The canvas's pixel buffer is sized in JS (see renderChart) to match its
+// on-screen box. If that box changes size without us knowing (sidebar
+// collapse/expand, grid reflow, container query changes, etc.) the browser
+// stretches the existing bitmap to fit the new box, which is what makes the
+// text look warped/blurry. A ResizeObserver catches every one of those
+// cases, not just window resizes.
+function initChartResizeObserver() {
+  const canvas = document.getElementById('progressChart');
+  if (!canvas || typeof ResizeObserver === 'undefined') {
+    // Fallback for very old browsers.
+    window.addEventListener('resize', renderChart);
+    return;
+  }
+  let raf = null;
+  const ro = new ResizeObserver(() => {
+    if (raf) cancelAnimationFrame(raf);
+    raf = requestAnimationFrame(renderChart);
+  });
+  ro.observe(canvas);
+  // Also catch the sidebar's width transition finishing.
+  window.addEventListener('resize', renderChart);
+}
+
+// ============ LEADERBOARD: AUTO-SCROLL ============
+// Slowly scrolls the leaderboard list up and down on its own, pausing for a
+// beat whenever it reaches the top or bottom. Pauses while the user's mouse
+// is hovering the list so they can read/interact without it drifting.
+let lbAutoScrollStarted = false;
+function initLeaderboardAutoScroll() {
+  if (lbAutoScrollStarted) return;
+  lbAutoScrollStarted = true;
+
+  const el = document.getElementById('leaderboard');
+  if (!el) return;
+
+  const SPEED = 0.4;      // px per animation frame (~60fps)
+  const PAUSE_MS = 3000;  // dwell time at each end
+
+  let dir = 1;            // 1 = scrolling down, -1 = scrolling up, 0 = paused at an end
+  let hovering = false;
+  let resumeTimer = null;
+
+  el.addEventListener('mouseenter', () => { hovering = true; });
+  el.addEventListener('mouseleave', () => { hovering = false; });
+
+  function tick() {
+    requestAnimationFrame(tick);
+    if (hovering || dir === 0) return;
+
+    const maxScroll = el.scrollHeight - el.clientHeight;
+    if (maxScroll <= 1) return; // nothing to scroll — list fits
+
+    el.scrollTop += dir * SPEED;
+
+    if (dir === 1 && el.scrollTop >= maxScroll - 0.5) {
+      el.scrollTop = maxScroll;
+      dir = 0;
+      clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(() => { dir = -1; }, PAUSE_MS);
+    } else if (dir === -1 && el.scrollTop <= 0.5) {
+      el.scrollTop = 0;
+      dir = 0;
+      clearTimeout(resumeTimer);
+      resumeTimer = setTimeout(() => { dir = 1; }, PAUSE_MS);
+    }
+  }
+  requestAnimationFrame(tick);
+}
+
+
 window.addEventListener('load', () => {
   loadData();          // populates teams + builds/cycles facts via renderAll()
   loadStartTime();
   setupDragDrop();
   loadSidebarState();
+  initLeaderboardAutoScroll();
+  initChartResizeObserver();
 });
-window.addEventListener('resize', renderChart);

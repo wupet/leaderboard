@@ -188,13 +188,19 @@
     .collapse-btn:hover { background: var(--surface-hover); box-shadow: 0 0 16px rgba(34,211,238,0.3); transform: none; }
     .collapse-btn svg { width: 20px; height: 20px; stroke: currentColor; }
 
-    /* TOP ROW: three mini-blocks */
-    .top-row {
+    /* MAIN ROW: two halves — leaderboard left, facts+chart stacked right */
+    .main-row {
         display: grid;
-        grid-template-columns: 1fr 1fr 1fr;
+        grid-template-columns: 1fr 1fr;
         gap: 22px;
-        margin-bottom: 22px;
-        flex: 0 0 auto;           /* fixed height, doesn't stretch */
+        flex: 1;
+        min-height: 0;
+    }
+    .right-col {
+        display: flex;
+        flex-direction: column;
+        gap: 22px;
+        min-height: 0;
     }
 
     .panel {
@@ -207,8 +213,15 @@
     .panel h2 .accent { color: var(--neon-cyan); }
 
     /* mini-block scroll areas so tables don't blow up the row height */
-    .mini-block { display: flex; flex-direction: column; max-height: 340px; }
+    .mini-block { display: flex; flex-direction: column; min-height: 0; }
     .mini-block .scroll-area { overflow-y: auto; flex: 1; }
+
+    /* leaderboard panel fills the full left column height */
+    .panel.leaderboard-panel { flex: 1; min-height: 0; }
+
+    /* fun facts panel on the right takes a fixed-ish share, chart takes the rest */
+    .right-col .facts-block { flex: 0 0 auto; }
+    .right-col .panel.full { flex: 1; margin-bottom: 0; }
 
     /* FUN FACTS CYCLING BLOCK */
     .facts-block .fact-view {
@@ -332,34 +345,30 @@
         <div class="counter"><strong id="teamCount">0</strong> teams finished</div>
       </div>
 
-      <!-- TOP ROW: 3 mini-blocks -->
-      <div class="top-row">
-        <div class="panel mini-block facts-block">
-          <h2>Fun Facts <span class="accent">— live</span></h2>
-          <div class="fact-view">
-            <div class="fact-inner" id="factInner"></div>
-          </div>
-          <div class="fact-dots" id="factDots"></div>
-        </div>
-
-        <div class="panel mini-block">
+      <!-- MAIN ROW: leaderboard left, facts + chart stacked right -->
+      <div class="main-row">
+        <div class="panel mini-block leaderboard-panel">
           <h2>Leaderboard <span class="accent">— by finish</span></h2>
           <div class="scroll-area" id="leaderboard"></div>
         </div>
 
-        <div class="panel mini-block">
-          <h2>Hint Usage <span class="accent">— per team</span></h2>
-          <div class="scroll-area" id="hintPanel"></div>
-        </div>
-      </div>
+        <div class="right-col">
+          <div class="panel mini-block facts-block">
+            <h2>Fun Facts <span class="accent">— live</span></h2>
+            <div class="fact-view">
+              <div class="fact-inner" id="factInner"></div>
+            </div>
+            <div class="fact-dots" id="factDots"></div>
+          </div>
 
-      <!-- GRAPH: full width bottom -->
-      <div class="panel full">
-        <h2>Progress Over Time <span class="accent">— cumulative finishers</span></h2>
-        <canvas id="progressChart"></canvas>
-        <!-- <div class="legend">
-          <span><i style="background:var(--neon-cyan)"></i> Finishers over the day</span>
-        </div> -->
+          <div class="panel full">
+            <h2>Number of Teams Finished <span class="accent">— cumulative</span></h2>
+            <canvas id="progressChart"></canvas>
+            <!-- <div class="legend">
+              <span><i style="background:var(--neon-cyan)"></i> Finishers over the day</span>
+            </div> -->
+          </div>
+        </div>
       </div>
     </main>
   </div>
